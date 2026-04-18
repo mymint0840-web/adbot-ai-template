@@ -26,33 +26,34 @@
 # DEVOPS-drafted 2026-04-19 per PLANNER dispatch (Quick Install Path A, B2 fix).
 ########################################################################
 
-# name intentionally omitted — CF Deploy Button prompts customer for a unique
-# project slug at deploy time; hardcoding here causes collision when the
-# customer's account already has an `adbot-ai` project (Golf's empirical
-# 2026-04-19 RED from the real CF Deploy Button test).
-# name = "<customer-chosen-slug>"
+# name IS required by wrangler schema — removing it breaks config parse (verified
+# via `bunx wrangler pages deploy`: 'Missing top-level field "name"').
+# Collision with customer's existing 'adbot-ai' project is a Deploy Button UX
+# issue the operator overrides at project-create time (CF Dashboard prompts for
+# project slug), NOT a schema-level fix.
+name = "adbot-ai"
 compatibility_date = "2025-03-28"
 compatibility_flags = ["nodejs_compat"]
 
-# ─── Pages build signals (explicit, so CF Deploy Button picks Pages path,
-# not Workers path; Golf's 2026-04-19 test showed the redirect landed on
-# `/workers-and-pages/create/deploy-to-workers` which defaulted to Workers
-# despite the `pages_build_output_dir` hint below — adding pages_build_command
-# strengthens the Pages signal).
-pages_build_command = "npm run build"
+# Pages output dir — the only wrangler.toml Pages-build key that exists in
+# the schema. `pages_build_command` is NOT a valid wrangler.toml field (verified
+# 2026-04-19: 'Unexpected fields found in top-level field: pages_build_command').
+# Build command is configured in CF Pages Dashboard post-project-create, OR via
+# the `_build` field in CF Dashboard's UI — not via wrangler.toml.
 pages_build_output_dir = "dist"
 
 [observability]
 enabled = true
 
 # ─── D1 — users, rules, bot_actions, audit history ───
-# Placeholder ID + name — CF Deploy Button creates a NEW D1 in the customer's
-# account and replaces these values before first deploy. Removing the
-# hardcoded `adbot-ai-db` name prevents collision when a customer already
-# has a DB with that name (Golf's empirical 2026-04-19 RED).
+# database_name is REQUIRED by schema (empty string triggers parse error on
+# Deploy Button path — not TESTED via wrangler CLI yet but conservative).
+# Hardcoded name = collision risk on the customer's own account is a Deploy
+# Button UX issue (customer sees CF prompt to choose new name) — NOT a
+# schema-layer fix.
 [[d1_databases]]
 binding = "DB"
-database_name = ""   # CF Deploy Button prompts/auto-generates — do not pre-fill
+database_name = "adbot-ai-db"                             # CF Deploy Button may prompt-override at provision
 database_id = "00000000-0000-0000-0000-000000000000"  # CF auto-provisions — do not edit
 
 # ─── KV — OAuth CSRF state + rate-limit counters ───
