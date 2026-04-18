@@ -64,44 +64,85 @@ id = "00000000000000000000000000000000"  # CF auto-provisions — do not edit
 #   3. Golf's brain-side cron (upstream, runs regardless of customer deployment)
 # Customer can safely skip this on first deploy — license works fine without it.
 
-# ─── Plain env vars ───
-# ADBOT_BRAIN_URL points at Golf's hosted brain. Customers share one brain; they
-# don't need to deploy their own. If Golf ever stands up a staging brain, flip
-# this to the staging URL in the public template for smoke deploys only.
+# ─── Plain env vars (pre-filled for self-host customers — v1.1 minimize-form) ───
+#
+# These are SAFE to pre-fill in a PUBLIC template because every value here is
+# either a public URL (brain, redirect) or a public OAuth client ID.
+#
+# GUARD-approved 2026-04-19 (v1.1 phased: no secrets in public repo — roadmap
+# v1.2 runtime-derive ADBOT_DOMAIN + PUBLIC_ORIGIN, v1.3 boot-gen JWT_SECRET,
+# v1.4 brain-proxy FB refactor removes FB_APP_SECRET from customer side).
 [vars]
+# Central brain — customer's deployment calls this for license validate + AI proxy.
 ADBOT_BRAIN_URL = "https://adbot-ai-brain.golfservera.workers.dev"
+
+# Central Facebook app ID (Hybrid C: all customers share one app).
+# ID only — NEVER pre-fill FB_APP_SECRET here; it's a secret, stays on brain.
+FB_APP_ID = "849762461469905"
+
+# NOTE on FB_REDIRECT_URI (NOT pre-filled in v1.1):
+#   Customer's legacy /api/auth/callback handler still does direct Meta token-
+#   exchange using a local FB_APP_SECRET. Until v1.4 BACKEND refactor routes
+#   all customer FB OAuth through the brain's /oauth/fb/callback, the redirect
+#   URI MUST be the customer's own domain (https://<their-pages>/api/auth/callback),
+#   not the brain's. Customer sets this post-deploy in CF Pages Dashboard +
+#   whitelists the same URL in Meta Dev Console → App Settings → FB Login.
+#
+#   Post v1.4: this block flips to
+#     FB_REDIRECT_URI = "https://adbot-ai-brain.golfservera.workers.dev/oauth/fb/callback"
+#   and customer removes their FB_APP_SECRET entirely.
 
 # ADBOT_DOMAIN must be set per-deployment (customer's own Pages subdomain).
 # Can be set via:
 #   - Pages Dashboard → Settings → Environment Variables → Production (plain)
 #   - `wrangler pages secret put ADBOT_DOMAIN` (secret)
 # Either works — brain reads it via process.env just the same.
+# Roadmap v1.2: auto-derived from CF_PAGES_URL at runtime; this comment goes away.
 
 ########################################################################
-# Required secrets (customer sets 7 of these post-deploy before first use):
+# Secrets the customer must set after deploy (5 required in v1.1, down from 7):
 #
-#   ADBOT_LICENSE_JWT      - The license JWT Golf sends after purchase.
-#                            Without this, /api/license/status returns misconfigured
-#                            and every /api/* route returns 402 license_required.
+# STEP 1 — minimum to boot (customer inputs only these):
 #
-#   ADBOT_DOMAIN           - Customer's CF Pages public subdomain (e.g. abc-ads.pages.dev).
-#                            MUST match the `domain` claim of the license JWT.
+#   ADBOT_LICENSE_JWT      - License JWT from purchase email. Without this,
+#                            every /api/* route returns 402 license_required.
 #
-#   FB_APP_ID              - Facebook App ID (digits).
-#   FB_APP_SECRET          - Facebook App Secret (32-char hex).
-#   FB_REDIRECT_URI        - https://<your-domain>/api/auth/callback.
-#                            Must be whitelisted in Meta Dev Console → App Settings →
-#                            Facebook Login → Valid OAuth Redirect URIs.
+#   ADBOT_DOMAIN           - Customer's CF Pages public subdomain (e.g.
+#                            abc-ads.pages.dev). Must match JWT.domain claim.
+#                            Roadmap v1.2 removes this ask (runtime-derived).
 #
-#   JWT_SECRET             - Random 64-char hex string (generate: openssl rand -hex 32)
-#   TOKEN_ENCRYPTION_KEY   - Random 64-char hex string (same generation method)
+# STEP 2 — FB OAuth (required for FB login; skip if customer doesn't use FB yet):
 #
-#   PUBLIC_ORIGIN          - https://<your-domain> (used for CORS on ad image proxy)
+#   FB_APP_SECRET          - Facebook App Secret (32 hex chars).
+#                            Get from: developers.facebook.com/apps/849762461469905
+#                            → Settings → Basic → 'App Secret' → Show.
+#                            Roadmap v1.4 removes this ask (brain-proxy routing).
+#
+#   FB_REDIRECT_URI        - https://<your-pages-domain>/api/auth/callback
+#                            Must also be whitelisted in Meta Dev Console →
+#                            FB Login → Valid OAuth Redirect URIs.
+#                            Roadmap v1.4 pre-fills this with brain URL.
+#
+# STEP 3 — session crypto (auto-generatable — customer can just press Generate
+# in CF Pages Dashboard, any random 64-char hex works; each deployment gets its
+# own unique pair, no sharing with Golf or other customers):
+#
+#   JWT_SECRET             - Random 64-char hex (generate: `openssl rand -hex 32`)
+#                            Roadmap v1.3 removes this ask (boot-generated into KV).
+#
+#   TOKEN_ENCRYPTION_KEY   - Random 64-char hex (same method as JWT_SECRET).
+#                            Roadmap v1.3 removes this ask.
+#
+# STEP 4 — runtime-derivable (customer sets once; v1.2 eliminates):
+#
+#   PUBLIC_ORIGIN          - https://<your-pages-domain> (for CORS on ad image
+#                            proxy). Roadmap v1.2 removes this ask.
 #
 # Push via Pages Dashboard OR CLI:
 #   bunx wrangler pages secret put <NAME> --project-name=<your-project-name>
 #
-# Optional (AI + telegram + email — customer can add later):
+# Optional (all skippable on first deploy — customer adds later via
+# /settings/integrations UI; roadmap v1.2 ships the UI):
 #   ANTHROPIC_API_KEY, CRON_SECRET,
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET,
 #   RESEND_API_KEY,
