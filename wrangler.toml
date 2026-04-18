@@ -106,16 +106,43 @@ FB_APP_ID = "849762461469905"
 # FB OAuth redirect URI → brain's callback (brain owns the code→token exchange
 # using its own FB_APP_SECRET; customer side never holds the secret).
 # Per GUARD audit 2026-04-19 + commit 2a99751 brain /oauth/fb/* single-URI pattern.
-# Already whitelisted in Meta Dev Console → 849762461469905 → FB Login → Valid
-# OAuth Redirect URIs (Golf added 2026-04-18).
-#
-# Implication for customer's legacy /api/auth/callback: Meta no longer routes
-# codes there — it's a dead endpoint from FB's perspective. Customer's login
-# button must use brain's /oauth/fb/authorize-init to kick off (so state JWT
-# carries return_url). v1.4 BACKEND refactor makes customer's UI wire through
-# the brain init path; until then, customer's existing FB-login flow will
-# redirect through brain and brain will redirect back with a session token.
 FB_REDIRECT_URI = "https://adbot-ai-brain.golfservera.workers.dev/oauth/fb/callback"
+
+# ─── Empty-string pre-fills — CF Deploy Button form behavior fix 2026-04-19 ───
+# Golf empirical test: ANY env var referenced by functions/ code but NOT in
+# [vars] block is rendered as a REQUIRED input in CF Deploy Button UI. The
+# customer then can't submit the form until they type placeholder text in
+# every empty slot — obviously wrong for optional/auto-handled fields.
+#
+# Declaring them here with empty string tells CF "these are pre-filled (with
+# empty), customer may override but is NOT required to fill". The worker code
+# already has defensive fallbacks (e.g., boot-secrets checks trim().length > 0
+# before falling through to KV; LLM-* fields have numeric defaults; Telegram
+# etc. are feature-gated on presence).
+#
+# ADBOT_LICENSE_JWT is intentionally OMITTED — it's the single required input,
+# the ONE field the customer MUST paste for the deployment to work.
+ADBOT_DOMAIN = ""                          # v1.2 runtime-derived from CF_PAGES_URL
+PUBLIC_ORIGIN = ""                         # v1.2 runtime-derived
+JWT_SECRET = ""                            # v1.3 boot-gen into ADBOT_SECRETS_KV
+TOKEN_ENCRYPTION_KEY = ""                  # v1.3 boot-gen
+CRON_SECRET = ""                           # v1.3 boot-gen
+ANTHROPIC_API_KEY = ""                     # AI features opt-in; set later via Settings
+RESEND_API_KEY = ""                        # Email opt-in; brain delivery fallback
+TELEGRAM_BOT_TOKEN = ""                    # Alerts opt-in
+TELEGRAM_CHAT_ID = ""                      # Alerts opt-in
+TELEGRAM_WEBHOOK_SECRET = ""               # Alerts opt-in
+CRM_WEBHOOK_SECRET = ""                    # CRM integration opt-in
+DEBUG_RULES = ""                           # Dev flag — leave empty in prod
+LLM_DISABLED = ""                          # Kill-switch; blank = enabled
+LLM_ALLOWED_MODELS = ""                    # csv of claude-* ids; blank = default allowlist
+LLM_MAX_INPUT_TOKENS = ""                  # numeric; blank = code default
+LLM_GLOBAL_DAILY_COST_USD_MICRO = ""       # numeric; blank = code default
+LLM_GLOBAL_HOURLY_COST_USD_MICRO = ""      # numeric; blank = code default
+LLM_GLOBAL_ALERT_THRESHOLD_PERMIL = ""     # numeric; blank = code default
+LLM_USER_DAILY_COST_USD_MICRO = ""         # numeric; blank = code default
+LLM_USER_DAILY_LIMIT = ""                  # numeric; blank = code default
+LLM_USER_HOURLY_LIMIT = ""                 # numeric; blank = code default
 
 # ADBOT_DOMAIN must be set per-deployment (customer's own Pages subdomain).
 # Can be set via:
