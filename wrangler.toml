@@ -108,41 +108,63 @@ FB_APP_ID = "849762461469905"
 # Per GUARD audit 2026-04-19 + commit 2a99751 brain /oauth/fb/* single-URI pattern.
 FB_REDIRECT_URI = "https://adbot-ai-brain.golfservera.workers.dev/oauth/fb/callback"
 
-# ─── Empty-string pre-fills — CF Deploy Button form behavior fix 2026-04-19 ───
-# Golf empirical test: ANY env var referenced by functions/ code but NOT in
-# [vars] block is rendered as a REQUIRED input in CF Deploy Button UI. The
-# customer then can't submit the form until they type placeholder text in
-# every empty slot — obviously wrong for optional/auto-handled fields.
+# ─── Non-empty pre-fills — v1.5 CF Deploy Button fix (2026-04-19) ───────────
+# Golf empirical 2026-04-19: CF Deploy Button rejects empty-string ""
+# pre-fills as INVALID (shows 'โปรดกรอกฟิลด์นี้' required-marker). Fix: give
+# every optional env var a non-empty default that existing customer code
+# already tolerates as "not configured".
 #
-# Declaring them here with empty string tells CF "these are pre-filled (with
-# empty), customer may override but is NOT required to fill". The worker code
-# already has defensive fallbacks (e.g., boot-secrets checks trim().length > 0
-# before falling through to KV; LLM-* fields have numeric defaults; Telegram
-# etc. are feature-gated on presence).
+# TWO strategies:
+#   1. Natural defaults (LLM_* numerics + switches) — values customer would
+#      use anyway; no behavioral change.
+#   2. Whitespace " " for code paths whose existing logic does `.trim()`
+#      then checks truthy/length — runtime-env.ts (ADBOT_DOMAIN, PUBLIC_ORIGIN)
+#      AND boot-secrets.ts (JWT_SECRET, TOKEN_ENCRYPTION_KEY, CRON_SECRET)
+#      BOTH explicitly trim + treat whitespace-only as "unset" per inline
+#      comments. Feature-gate code (Telegram, Resend, CRM, Anthropic) uses
+#      raw truthy `if (env.FOO)` — a whitespace value passes truthy AND then
+#      API call fails fast at the integration point (401 / 404), degrading
+#      the feature gracefully to "not working until customer replaces the
+#      space with a real value".
 #
-# ADBOT_LICENSE_JWT is intentionally OMITTED — it's the single required input,
-# the ONE field the customer MUST paste for the deployment to work.
-ADBOT_DOMAIN = ""                          # v1.2 runtime-derived from CF_PAGES_URL
-PUBLIC_ORIGIN = ""                         # v1.2 runtime-derived
-JWT_SECRET = ""                            # v1.3 boot-gen into ADBOT_SECRETS_KV
-TOKEN_ENCRYPTION_KEY = ""                  # v1.3 boot-gen
-CRON_SECRET = ""                           # v1.3 boot-gen
-ANTHROPIC_API_KEY = ""                     # AI features opt-in; set later via Settings
-RESEND_API_KEY = ""                        # Email opt-in; brain delivery fallback
-TELEGRAM_BOT_TOKEN = ""                    # Alerts opt-in
-TELEGRAM_CHAT_ID = ""                      # Alerts opt-in
-TELEGRAM_WEBHOOK_SECRET = ""               # Alerts opt-in
-CRM_WEBHOOK_SECRET = ""                    # CRM integration opt-in
-DEBUG_RULES = ""                           # Dev flag — leave empty in prod
-LLM_DISABLED = ""                          # Kill-switch; blank = enabled
-LLM_ALLOWED_MODELS = ""                    # csv of claude-* ids; blank = default allowlist
-LLM_MAX_INPUT_TOKENS = ""                  # numeric; blank = code default
-LLM_GLOBAL_DAILY_COST_USD_MICRO = ""       # numeric; blank = code default
-LLM_GLOBAL_HOURLY_COST_USD_MICRO = ""      # numeric; blank = code default
-LLM_GLOBAL_ALERT_THRESHOLD_PERMIL = ""     # numeric; blank = code default
-LLM_USER_DAILY_COST_USD_MICRO = ""         # numeric; blank = code default
-LLM_USER_DAILY_LIMIT = ""                  # numeric; blank = code default
-LLM_USER_HOURLY_LIMIT = ""                 # numeric; blank = code default
+# ADBOT_LICENSE_JWT intentionally OMITTED — it's the single required input,
+# the ONE field customer MUST paste for deployment to work.
+
+# v1.2 runtime-derive (runtime-env.ts treats whitespace as unset → falls
+# through to CF_PAGES_URL derive)
+ADBOT_DOMAIN = " "
+PUBLIC_ORIGIN = " "
+
+# v1.3 boot-gen into ADBOT_SECRETS_KV (boot-secrets.ts:123 treats
+# whitespace-length-0 as unset → falls through to KV auto-gen)
+JWT_SECRET = " "
+TOKEN_ENCRYPTION_KEY = " "
+CRON_SECRET = " "
+
+# Optional integrations — whitespace triggers feature-gate truthy but
+# API calls fail fast; customer replaces " " with real value to enable.
+ANTHROPIC_API_KEY = " "
+RESEND_API_KEY = " "
+TELEGRAM_BOT_TOKEN = " "
+TELEGRAM_CHAT_ID = " "
+TELEGRAM_WEBHOOK_SECRET = " "
+CRM_WEBHOOK_SECRET = " "
+
+# Dev flag — code checks `=== '1'` so "0" is the documented "off" value.
+DEBUG_RULES = "0"
+
+# LLM governance — natural defaults matching llm-guard.ts fallback logic.
+# These ARE the values code uses when env is unset; setting them explicitly
+# here just makes the CF UI happy without changing behavior.
+LLM_DISABLED = "0"                              # "1" = kill-switch; "0" = enabled
+LLM_ALLOWED_MODELS = "claude-sonnet-4-5,claude-haiku-4-5"  # csv; unset = empty allowlist → all denied, so explicit allow here
+LLM_MAX_INPUT_TOKENS = "8000"                   # llm-guard.ts:53 default
+LLM_GLOBAL_DAILY_COST_USD_MICRO = "50000000"    # llm-guard.ts:69 default = $50
+LLM_GLOBAL_HOURLY_COST_USD_MICRO = "5000000"    # llm-guard.ts:67 default = $5
+LLM_GLOBAL_ALERT_THRESHOLD_PERMIL = "800"       # llm-guard.ts:76 default = 80%
+LLM_USER_DAILY_COST_USD_MICRO = "2000000"       # llm-guard.ts:66 default = $2
+LLM_USER_DAILY_LIMIT = "100"                    # llm-guard.ts:65 default
+LLM_USER_HOURLY_LIMIT = "20"                    # llm-guard.ts:64 default
 
 # ADBOT_DOMAIN must be set per-deployment (customer's own Pages subdomain).
 # Can be set via:
