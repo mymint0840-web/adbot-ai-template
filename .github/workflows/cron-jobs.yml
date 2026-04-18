@@ -1,0 +1,77 @@
+name: AdBot Cron Jobs
+
+on:
+  schedule:
+    # A1: Rules evaluate — every hour
+    - cron: '0 * * * *'
+    # A3: Telegram daily summary — 09:00 Bangkok (02:00 UTC)
+    - cron: '0 2 * * *'
+    # A5: Token refresh — Monday 10:00 Bangkok (03:00 UTC)
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Which job to run (evaluate, daily-summary, refresh-token, all)'
+        required: true
+        default: 'all'
+
+env:
+  ADBOT_URL: https://facebook-ad-scaler.pages.dev
+
+jobs:
+  evaluate:
+    if: >-
+      github.event.schedule == '0 * * * *' ||
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'evaluate' || github.event.inputs.job == 'all')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rules Evaluate
+        run: |
+          TIMESTAMP=$(date +%s)
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "X-Cron-Timestamp: $TIMESTAMP" \
+            -H "Content-Type: application/json" \
+            "$ADBOT_URL/api/rules/evaluate")
+          echo "Status: $STATUS"
+          cat /tmp/response.json
+          [ "$STATUS" = "200" ] || exit 1
+
+  daily-summary:
+    if: >-
+      github.event.schedule == '0 2 * * *' ||
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'daily-summary' || github.event.inputs.job == 'all')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Telegram Daily Summary
+        run: |
+          TIMESTAMP=$(date +%s)
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "X-Cron-Timestamp: $TIMESTAMP" \
+            -H "Content-Type: application/json" \
+            "$ADBOT_URL/api/telegram/daily-summary")
+          echo "Status: $STATUS"
+          cat /tmp/response.json
+          [ "$STATUS" = "200" ] || exit 1
+
+  refresh-token:
+    if: >-
+      github.event.schedule == '0 3 * * 1' ||
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'refresh-token' || github.event.inputs.job == 'all')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Token Refresh
+        run: |
+          TIMESTAMP=$(date +%s)
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "X-Cron-Timestamp: $TIMESTAMP" \
+            -H "Content-Type: application/json" \
+            "$ADBOT_URL/api/auth/refresh-token")
+          echo "Status: $STATUS"
+          cat /tmp/response.json
+          [ "$STATUS" = "200" ] || exit 1
