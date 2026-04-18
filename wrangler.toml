@@ -49,6 +49,16 @@ database_id = "00000000-0000-0000-0000-000000000000"  # CF auto-provisions — d
 binding = "STATE_KV"
 id = "00000000000000000000000000000000"  # CF auto-provisions — do not edit
 
+# ─── KV — v1.3 boot-generated secrets (JWT_SECRET + TOKEN_ENCRYPTION_KEY +
+# CRON_SECRET). Worker auto-generates these on first request if env vars
+# are unset; persists to this KV namespace; reuses forever after. Separate
+# from STATE_KV per GUARD A3 blast-radius isolation.
+# Placeholder ID — CF Deploy Button creates a new KV named `adbot-secrets`
+# in the customer's account; v1.3 boot-secrets.ts uses whichever binding.
+[[kv_namespaces]]
+binding = "ADBOT_SECRETS_KV"
+id = "00000000000000000000000000000001"  # CF auto-provisions — do not edit
+
 # ─── Optional — Cloudflare Queues for AI feature async work ───
 # Only needed if you run the ai-features-consumer/ worker. Comment out if
 # not using. Create with: bunx wrangler queues create ai-features-queue
@@ -102,57 +112,42 @@ FB_REDIRECT_URI = "https://adbot-ai-brain.golfservera.workers.dev/oauth/fb/callb
 # Roadmap v1.2: auto-derived from CF_PAGES_URL at runtime; this comment goes away.
 
 ########################################################################
-# Secrets the customer must set after deploy (5 required in v1.1, down from 7):
+# Customer env surface (v1.3 + v1.4 shipped): ONE required input only.
 #
-# STEP 1 — minimum to boot (customer inputs only these):
+# REQUIRED — 1 field:
 #
 #   ADBOT_LICENSE_JWT      - License JWT from purchase email. Without this,
 #                            every /api/* route returns 402 license_required.
+#                            This is the ONLY customer-set secret post-v1.4.
 #
-#   ADBOT_DOMAIN           - Customer's CF Pages public subdomain (e.g.
-#                            abc-ads.pages.dev). Must match JWT.domain claim.
-#                            Roadmap v1.2 removes this ask (runtime-derived).
+# AUTO-HANDLED by the worker (customer does nothing):
+#   - JWT_SECRET           — v1.3 boot-gen into ADBOT_SECRETS_KV on first request
+#   - TOKEN_ENCRYPTION_KEY — v1.3 boot-gen same path
+#   - CRON_SECRET          — v1.3 boot-gen same path
+#   - ADBOT_DOMAIN         — v1.2 derived from CF_PAGES_URL at runtime
+#   - PUBLIC_ORIGIN        — v1.2 derived from CF_PAGES_URL at runtime
+#   - FB_APP_SECRET        — v1.4 removed; all FB OAuth routes through brain
+#                            (brain holds the secret in its own Worker secret)
+#   - FB_APP_ID            — pre-filled in [vars] above (public value)
+#   - FB_REDIRECT_URI      — pre-filled in [vars] above (brain callback URL)
+#   - ADBOT_BRAIN_URL      — pre-filled in [vars] above
 #
-# STEP 2 — FB OAuth (still required in v1.1 — v1.4 removes):
-#
-#   FB_APP_SECRET          - Facebook App Secret (32 hex chars).
-#                            Get from: developers.facebook.com/apps/849762461469905
-#                            → Settings → Basic → 'App Secret' → Show.
-#                            Customer's legacy /api/auth/callback + refresh-token
-#                            still use this for local Meta token exchange. Roadmap
-#                            v1.4 BACKEND refactor routes all FB calls through
-#                            brain proxy → this ask goes away + this line deletes.
-#
-#   (FB_REDIRECT_URI is already pre-filled in [vars] above to brain URL —
-#    no customer action required.)
-#
-# STEP 3 — session crypto (auto-generatable — customer can just press Generate
-# in CF Pages Dashboard, any random 64-char hex works; each deployment gets its
-# own unique pair, no sharing with Golf or other customers):
-#
-#   JWT_SECRET             - Random 64-char hex (generate: `openssl rand -hex 32`)
-#                            Roadmap v1.3 removes this ask (boot-generated into KV).
-#
-#   TOKEN_ENCRYPTION_KEY   - Random 64-char hex (same method as JWT_SECRET).
-#                            Roadmap v1.3 removes this ask.
-#
-# STEP 4 — runtime-derivable (customer sets once; v1.2 eliminates):
-#
-#   PUBLIC_ORIGIN          - https://<your-pages-domain> (for CORS on ad image
-#                            proxy). Roadmap v1.2 removes this ask.
-#
-# Push via Pages Dashboard OR CLI:
-#   bunx wrangler pages secret put <NAME> --project-name=<your-project-name>
-#
-# Optional (all skippable on first deploy — customer adds later via
-# /settings/integrations UI; roadmap v1.2 ships the UI):
-#   ANTHROPIC_API_KEY, CRON_SECRET,
-#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET,
-#   RESEND_API_KEY,
-#   LLM_DISABLED, LLM_ALLOWED_MODELS, LLM_MAX_INPUT_TOKENS,
+# OPTIONAL (all skippable on first deploy — customer adds later via
+# /settings/integrations UI for runtime config):
+#   ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,
+#   TELEGRAM_WEBHOOK_SECRET, RESEND_API_KEY, LLM_DISABLED,
+#   LLM_ALLOWED_MODELS, LLM_MAX_INPUT_TOKENS,
 #   LLM_GLOBAL_DAILY_COST_USD_MICRO, LLM_GLOBAL_HOURLY_COST_USD_MICRO,
 #   LLM_USER_DAILY_LIMIT, LLM_USER_HOURLY_LIMIT
 #
+# Push via Pages Dashboard OR CLI:
+#   bunx wrangler pages secret put ADBOT_LICENSE_JWT --project-name=<project>
+#
 # Do NOT set these in self-host deployments (dev endpoints are stripped):
 #   DEV_TOKEN_INJECT, DEV_TRIGGER_ENABLED, DEBUG_RULES
+#
+# Override escape hatches (for ops rotation, advanced customers):
+# Explicit JWT_SECRET / TOKEN_ENCRYPTION_KEY / CRON_SECRET env vars take
+# precedence over boot-gen — customer can rotate by setting the env var
+# and deleting the matching KV key (next cold start regenerates).
 ########################################################################
