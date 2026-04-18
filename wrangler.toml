@@ -130,25 +130,30 @@ FB_REDIRECT_URI = "https://adbot-ai-brain.golfservera.workers.dev/oauth/fb/callb
 # ADBOT_LICENSE_JWT intentionally OMITTED — it's the single required input,
 # the ONE field customer MUST paste for deployment to work.
 
-# v1.2 runtime-derive (runtime-env.ts treats whitespace as unset → falls
-# through to CF_PAGES_URL derive)
-ADBOT_DOMAIN = " "
-PUBLIC_ORIGIN = " "
+# v1.2 runtime-derive — placeholder string that `isPlaceholderEnv()` in
+# functions/_lib/env-placeholders.ts recognizes + runtime-env.ts treats as
+# unset → derives from CF_PAGES_URL. Non-whitespace so CF Deploy Button
+# doesn't trim-to-empty (Golf's 9th 'wishes ≠ reality' empirical find).
+ADBOT_DOMAIN = "auto-derive"
+PUBLIC_ORIGIN = "auto-derive"
 
-# v1.3 boot-gen into ADBOT_SECRETS_KV (boot-secrets.ts:123 treats
-# whitespace-length-0 as unset → falls through to KV auto-gen)
-JWT_SECRET = " "
-TOKEN_ENCRYPTION_KEY = " "
-CRON_SECRET = " "
+# v1.3 boot-gen — placeholder recognized by boot-secrets.ts → falls through
+# to ADBOT_SECRETS_KV auto-generation on first cold isolate.
+JWT_SECRET = "auto-generate"
+TOKEN_ENCRYPTION_KEY = "auto-generate"
+CRON_SECRET = "auto-generate"
 
-# Optional integrations — whitespace triggers feature-gate truthy but
-# API calls fail fast; customer replaces " " with real value to enable.
-ANTHROPIC_API_KEY = " "
-RESEND_API_KEY = " "
-TELEGRAM_BOT_TOKEN = " "
-TELEGRAM_CHAT_ID = " "
-TELEGRAM_WEBHOOK_SECRET = " "
-CRM_WEBHOOK_SECRET = " "
+# Optional integrations — literal "disabled" string. Feature-gate code does
+# `if (!env.X) return;` → "disabled" is truthy, so code calls the integration
+# API with "disabled" as the token/key/secret → Meta / Anthropic / Resend /
+# CRM return 401/404/4xx at API layer → feature silently doesn't work.
+# Customer replaces "disabled" with real value to enable. No app crash.
+ANTHROPIC_API_KEY = "disabled"
+RESEND_API_KEY = "disabled"
+TELEGRAM_BOT_TOKEN = "disabled"
+TELEGRAM_CHAT_ID = "disabled"
+TELEGRAM_WEBHOOK_SECRET = "disabled"
+CRM_WEBHOOK_SECRET = "disabled"
 
 # Dev flag — code checks `=== '1'` so "0" is the documented "off" value.
 DEBUG_RULES = "0"
