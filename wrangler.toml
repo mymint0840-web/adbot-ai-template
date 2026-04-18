@@ -80,17 +80,19 @@ ADBOT_BRAIN_URL = "https://adbot-ai-brain.golfservera.workers.dev"
 # ID only — NEVER pre-fill FB_APP_SECRET here; it's a secret, stays on brain.
 FB_APP_ID = "849762461469905"
 
-# NOTE on FB_REDIRECT_URI (NOT pre-filled in v1.1):
-#   Customer's legacy /api/auth/callback handler still does direct Meta token-
-#   exchange using a local FB_APP_SECRET. Until v1.4 BACKEND refactor routes
-#   all customer FB OAuth through the brain's /oauth/fb/callback, the redirect
-#   URI MUST be the customer's own domain (https://<their-pages>/api/auth/callback),
-#   not the brain's. Customer sets this post-deploy in CF Pages Dashboard +
-#   whitelists the same URL in Meta Dev Console → App Settings → FB Login.
+# FB OAuth redirect URI → brain's callback (brain owns the code→token exchange
+# using its own FB_APP_SECRET; customer side never holds the secret).
+# Per GUARD audit 2026-04-19 + commit 2a99751 brain /oauth/fb/* single-URI pattern.
+# Already whitelisted in Meta Dev Console → 849762461469905 → FB Login → Valid
+# OAuth Redirect URIs (Golf added 2026-04-18).
 #
-#   Post v1.4: this block flips to
-#     FB_REDIRECT_URI = "https://adbot-ai-brain.golfservera.workers.dev/oauth/fb/callback"
-#   and customer removes their FB_APP_SECRET entirely.
+# Implication for customer's legacy /api/auth/callback: Meta no longer routes
+# codes there — it's a dead endpoint from FB's perspective. Customer's login
+# button must use brain's /oauth/fb/authorize-init to kick off (so state JWT
+# carries return_url). v1.4 BACKEND refactor makes customer's UI wire through
+# the brain init path; until then, customer's existing FB-login flow will
+# redirect through brain and brain will redirect back with a session token.
+FB_REDIRECT_URI = "https://adbot-ai-brain.golfservera.workers.dev/oauth/fb/callback"
 
 # ADBOT_DOMAIN must be set per-deployment (customer's own Pages subdomain).
 # Can be set via:
@@ -111,17 +113,18 @@ FB_APP_ID = "849762461469905"
 #                            abc-ads.pages.dev). Must match JWT.domain claim.
 #                            Roadmap v1.2 removes this ask (runtime-derived).
 #
-# STEP 2 — FB OAuth (required for FB login; skip if customer doesn't use FB yet):
+# STEP 2 — FB OAuth (still required in v1.1 — v1.4 removes):
 #
 #   FB_APP_SECRET          - Facebook App Secret (32 hex chars).
 #                            Get from: developers.facebook.com/apps/849762461469905
 #                            → Settings → Basic → 'App Secret' → Show.
-#                            Roadmap v1.4 removes this ask (brain-proxy routing).
+#                            Customer's legacy /api/auth/callback + refresh-token
+#                            still use this for local Meta token exchange. Roadmap
+#                            v1.4 BACKEND refactor routes all FB calls through
+#                            brain proxy → this ask goes away + this line deletes.
 #
-#   FB_REDIRECT_URI        - https://<your-pages-domain>/api/auth/callback
-#                            Must also be whitelisted in Meta Dev Console →
-#                            FB Login → Valid OAuth Redirect URIs.
-#                            Roadmap v1.4 pre-fills this with brain URL.
+#   (FB_REDIRECT_URI is already pre-filled in [vars] above to brain URL —
+#    no customer action required.)
 #
 # STEP 3 — session crypto (auto-generatable — customer can just press Generate
 # in CF Pages Dashboard, any random 64-char hex works; each deployment gets its
