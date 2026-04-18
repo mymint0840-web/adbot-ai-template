@@ -26,21 +26,33 @@
 # DEVOPS-drafted 2026-04-19 per PLANNER dispatch (Quick Install Path A, B2 fix).
 ########################################################################
 
-name = "adbot-ai"                       # customer: change to your own project slug if desired
+# name intentionally omitted — CF Deploy Button prompts customer for a unique
+# project slug at deploy time; hardcoding here causes collision when the
+# customer's account already has an `adbot-ai` project (Golf's empirical
+# 2026-04-19 RED from the real CF Deploy Button test).
+# name = "<customer-chosen-slug>"
 compatibility_date = "2025-03-28"
 compatibility_flags = ["nodejs_compat"]
+
+# ─── Pages build signals (explicit, so CF Deploy Button picks Pages path,
+# not Workers path; Golf's 2026-04-19 test showed the redirect landed on
+# `/workers-and-pages/create/deploy-to-workers` which defaulted to Workers
+# despite the `pages_build_output_dir` hint below — adding pages_build_command
+# strengthens the Pages signal).
+pages_build_command = "npm run build"
 pages_build_output_dir = "dist"
 
 [observability]
 enabled = true
 
 # ─── D1 — users, rules, bot_actions, audit history ───
-# Placeholder ID — CF Deploy Button creates a NEW D1 named `adbot-ai-db` in the
-# customer's account and replaces this value before first deploy. If CF instead
-# tries to resolve the zero UUID, expect a 404 and treat it as a hard blocker.
+# Placeholder ID + name — CF Deploy Button creates a NEW D1 in the customer's
+# account and replaces these values before first deploy. Removing the
+# hardcoded `adbot-ai-db` name prevents collision when a customer already
+# has a DB with that name (Golf's empirical 2026-04-19 RED).
 [[d1_databases]]
 binding = "DB"
-database_name = "adbot-ai-db"
+database_name = ""   # CF Deploy Button prompts/auto-generates — do not pre-fill
 database_id = "00000000-0000-0000-0000-000000000000"  # CF auto-provisions — do not edit
 
 # ─── KV — OAuth CSRF state + rate-limit counters ───
